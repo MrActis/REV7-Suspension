@@ -1,43 +1,39 @@
 """
 Dynamics module
 Contains classes and functions for suspension dynamics
-Classes: Vector, CoordSys
-Functions: subtract_v, cross_v, make_rotation
+Classes: Vector, RefFrame
+Functions: make_rotation
 """
 from sympy import ImmutableMatrix, Symbol, shape, sin, cos
-from math import sqrt, radians
+from math import sqrt, acos, radians
 
 
 class Vector:
     """
     Vector class
-    Used to store a 3D vector
+    Represents a 3D vector
     Attributes:
         v : ImmutableMatrix
             3D column vector
     Methods:
-        __init__(v)
-        get()
+        __init__(vec)
         norm()
         unit()
+        add(vec)
+        subtract(vec)
+        dot(vec)
+        cross(vec)
+        angle(vec)
     """
-    def __init__(self, v: ImmutableMatrix):
+    def __init__(self, vec: ImmutableMatrix):
         """
         Vector class constructor
         :param v: 3D vector of type ImmutableMatrix
         :raises: :class:'ValueError': if not a 3D vector
         """
-        if shape(v) != (3, 1):
+        if shape(vec) != (3, 1):
             raise ValueError('not a 3D vector')
-        self.__v = v
-
-    def get(self) -> ImmutableMatrix:
-        """
-        Getter for Vector class
-        :return: immutable 3D vector
-        :rtype: ImmutableMatrix
-        """
-        return self.__v
+        self.v = vec
 
     def norm(self) -> float:
         """
@@ -45,7 +41,7 @@ class Vector:
         :return: vector norm
         :rtype: float
         """
-        return sqrt(self.__v.dot(self.__v))
+        return sqrt(self.v.dot(self.v))
 
     def unit(self):
         """
@@ -53,75 +49,104 @@ class Vector:
         :return: unit vector
         :rtype: Vector
         """
-        return Vector((1 / self.__v.norm()) * self.__v)
+        return Vector((1.0 / self.norm()) * self.v)
 
-    def add(self, v):
+    def add(self, vec):
         """
         Adds two Vectors
-        :param v: vector to add of type Vector
+        :param vec: vector to add of type Vector
         :return: self vector plus input vector
         :rtype: Vector
+        :raises: :class:'ValueError': if input is not of type Vector
         """
-        if not isinstance(v, Vector):
-            raise ValueError('not a vector')
+        if not isinstance(vec, Vector):
+            raise ValueError('input not a vector')
         else:
-            return Vector(self.get() + v.get())
+            return Vector(self.v + vec.v)
 
-    def subtract(self, v):
+    def subtract(self, vec):
         """
         Subtracts two Vectors
-        :param v: vector to subtract of type Vector
+        :param vec: vector to subtract of type Vector
         :return: self vector minus input vector
         :rtype: Vector
+        :raises: :class:'ValueError': if input is not of type Vector
         """
-        if not isinstance(v, Vector):
-            raise ValueError('not a vector')
+        if not isinstance(vec, Vector):
+            raise ValueError('input not a vector')
         else:
-            return Vector(self.get() - v.get())
+            return Vector(self.v - vec.v)
 
-    def cross(self, v):
+    def dot(self, vec) -> float:
+        """
+        Dot product of two Vectors
+        :param vec: vector of type Vector
+        :return: dot product of two vectors
+        :rtype: float
+        :raises: :class:'ValueError': if input is not of type Vector
+        """
+        if not isinstance(vec, Vector):
+            raise ValueError('input not a vector')
+        else:
+            return self.v.dot(vec.v)
+
+    def cross(self, vec):
         """
         Cross product of two Vectors
-        :param v: vector of type Vector
+        :param vec: vector of type Vector
         :return: self vector cross input vector
         :rtype: Vector
+        :raises: :class:'ValueError': if input is not of type Vector
         """
-        if not isinstance(v, Vector):
-            raise ValueError('not a vector')
+        if not isinstance(vec, Vector):
+            raise ValueError('input not a vector')
         else:
-            return Vector(self.get().cross(v.get()))
+            return Vector(self.v.cross(vec.v))
+
+    def angle(self, vec) -> float:
+        """
+        Angle between two Vectors
+        :param vec: vector of type Vector
+        :return: angle between two vectors in radians
+        :rtype: float
+        :raises: :class:'ValueError': if input is not of type Vector
+        """
+        if not isinstance(vec, Vector):
+            raise ValueError('input not a vector')
+        else:
+            return acos(self.dot(vec) / (self.norm() * vec.norm()))
 
 
-class CoordSys:
+class RefFrame:
     """
-    CoordSys class
-    Defines a 3D coordinate system
+    RefFrame class
+    Defines a reference frame
     Attributes:
         origin : Vector
-            origin of coordinate system with respect to parent's origin, in
+            origin of reference frame with respect to parent's origin, in
             parent coordinates
         r_p_l : ImmutableMatrix
-            rotation matrix from self's coordinate system to parent
-        parent : CoordSys
-            parent coordinate system
+            rotation matrix from reference frame to parent
+        parent : RefFrame
+            parent reference frame
     Methods:
         __init__(o, p, r)
         get_origin()
         get_parent()
         get_rotation()
         set_rotation(r_new)
-        get_coords(v, sys)
+        get_coords(vec, frame)
     """
     def __init__(self, o: Vector, p = None, r: ImmutableMatrix = None):
         """
-        CoordSys class constructor
+        RefFrame class constructor
         :param o: origin in parent coordinates of type Vector
-        :param p: parent of type CoordSys
+        :param p: parent of type RefFrame
         :param r: rotation matrix to parent of type ImmutableMatrix
-        :raises: :class:'ValueError': if p is not of type CoordSys
+        :raises: :class:'ValueError': if p is not of type RefFrame
         :raises: :class:'ValueError': if r is not a valid rotation matrix
         """
-        if p is not None and not isinstance(p, CoordSys):
+        if p is not None and not isinstance(p, RefFrame):
             raise ValueError('invalid parent')
         if p is not None and r is None:
             raise ValueError('invalid rotation matrix')
@@ -136,7 +161,7 @@ class CoordSys:
     def get_origin(self) -> Vector:
         """
         Getter for origin
-        :return: origin of coordinate system
+        :return: origin of reference frame
         :rtype: Vector
         """
         return self.__origin
@@ -144,8 +169,8 @@ class CoordSys:
     def get_parent(self):
         """
         Getter for parent
-        :return: parent of coordinate system
-        :rtype: CoordSys
+        :return: parent reference frame
+        :rtype: RefFrame
         :raises: :class:'ValueError': if there is no parent
         """
         if self.__parent is None:
@@ -156,7 +181,7 @@ class CoordSys:
     def get_rotation(self) -> ImmutableMatrix:
         """
         Getter for rotation matrix
-        :return: rotation matrix from self's coordinate system to parent
+        :return: rotation matrix from reference frame to parent
         :rtype: ImmutableMatrix
         :raises: :class:'ValueError': if there is no rotation matrix
         """
@@ -168,29 +193,29 @@ class CoordSys:
     def set_rotation(self, r_new: ImmutableMatrix):
         """
         Setter for rotation matrix
-        :param r_new: new rotation matrix from self's coordinate system to
-                      parent of type ImmutableMatrix
+        :param r_new: new rotation matrix from reference frame to parent of
+                      type ImmutableMatrix
         :return: updates the rotation matrix
         """
         self.__r_p_l = r_new
 
-    def get_coords(self, v: Vector, sys) -> Vector:
+    def get_coords(self, vec: Vector, frame) -> Vector:
         """
-        Converts coordinate from self's coordinate system to an ancestor's
-        coordinate system
-        :param v: a coordinate in self's coordinate system of type Vector
-        :param sys: coordinate system to convert to of type CoordSys
+        Converts coordinate from reference frame to an ancestor's coordinate
+        system
+        :param vec: a coordinate in self's coordinate system of type Vector
+        :param frame: coordinate system to convert to of type RefFrame
         :return: coordinate in new coordinate system
         :rtype: Vector
-        :raises: :class:'ValueError': if sys is not an ancestor
+        :raises: :class:'ValueError': if frame is not an ancestor
         """
-        if self.__parent is None and sys != self:
+        if self.__parent is None and frame != self:
             raise ValueError('cannot transform coordinates')
-        if sys == self:
-            return v
+        if frame == self:
+            return vec
         else:
-            new_coords = self.__origin.get() + self.__r_p_l * v.get()
-            return self.__parent.get_coords(Vector(new_coords), sys)
+            new_coords = self.__origin.v + self.__r_p_l * vec.v
+            return self.__parent.get_coords(Vector(new_coords), frame)
 
 
 def make_rotation(a, axis: str, deg: bool = True) -> ImmutableMatrix:

@@ -1,5 +1,6 @@
 """
 Various functions for suspension calculations and visualization
+Functions: calc_susp_forces
 """
 from dynamics import Vector
 from sympy import ImmutableMatrix
@@ -43,20 +44,20 @@ def calc_susp_forces(d_lf: Vector, d_lr: Vector, d_uf: Vector, d_ur: Vector,
     n_t = d_t.unit()
 
     # moments about tire-ground contact center point
-    m_lf = r_l.cross(n_lf).get()
-    m_lr = r_l.cross(n_lr).get()
-    m_uf = r_u.cross(n_uf).get()
-    m_ur = r_u.cross(n_ur).get()
-    m_p = r_p.cross(n_p).get()
-    m_t = r_t.cross(n_t).get()
+    m_lf = r_l.cross(n_lf).v
+    m_lr = r_l.cross(n_lr).v
+    m_uf = r_u.cross(n_uf).v
+    m_ur = r_u.cross(n_ur).v
+    m_p = r_p.cross(n_p).v
+    m_t = r_t.cross(n_t).v
 
     # system of linear equations matrix
-    n_lf = n_lf.get()
-    n_lr = n_lr.get()
-    n_uf = n_uf.get()
-    n_ur = n_ur.get()
-    n_p = n_p.get()
-    n_t = n_t.get()
+    n_lf = n_lf.v
+    n_lr = n_lr.v
+    n_uf = n_uf.v
+    n_ur = n_ur.v
+    n_p = n_p.v
+    n_t = n_t.v
     a = ImmutableMatrix([[n_lf[0], n_lr[0], n_uf[0], n_ur[0], n_p[0], n_t[0]],
                          [n_lf[1], n_lr[1], n_uf[1], n_ur[1], n_p[1], n_t[1]],
                          [n_lf[2], n_lr[2], n_uf[2], n_ur[2], n_p[2], n_t[2]],
@@ -65,7 +66,7 @@ def calc_susp_forces(d_lf: Vector, d_lr: Vector, d_uf: Vector, d_ur: Vector,
                          [m_lf[2], m_lr[2], m_uf[2], m_ur[2], m_p[2], m_t[2]]])
 
     # solution in form (fx, fy, fz, mx, my, mz)
-    f_t = -f_t.get()
+    f_t = -f_t.v
     b = ImmutableMatrix([f_t[0], f_t[1], f_t[2], 0.0, 0.0, 0.0])
 
     # solve

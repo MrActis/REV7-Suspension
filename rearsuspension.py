@@ -1,7 +1,7 @@
 """
 Rear suspension model
 """
-from dynamics import Vector, CoordSys
+from dynamics import Vector, RefFrame
 from sympy import ImmutableMatrix
 import components as cp
 import numpy as np
@@ -37,9 +37,9 @@ rocker_transform = ImmutableMatrix([[0.51559649, -0.16262435, -0.84125714],
                                     [0.67235043, 0.68540529, 0.27957912]])
 
 # coordinate systems
-global_sys = CoordSys(h_shock)
-lca_sys = CoordSys(h_lca_f, p=global_sys, r=lca_transform)
-rocker_sys = CoordSys(h_rocker, p=global_sys, r=rocker_transform)
+global_sys = RefFrame(h_shock)
+lca_sys = RefFrame(h_lca_f, p=global_sys, r=lca_transform)
+rocker_sys = RefFrame(h_rocker, p=global_sys, r=rocker_transform)
 
 # components
 rear_lca = cp.ControlArm(h_lca_r, h_lca_up, lca_sys, side='r', prod=h_lca_pr)
