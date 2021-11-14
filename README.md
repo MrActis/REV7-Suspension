@@ -1,8 +1,8 @@
 ## Directory
 **Modules**
-- [Dynamics](dynamics.py): classes and functions used to model suspension dynamics
-- [Components](components.py): classes for defining suspension components
-- [Functions](functions.py): functions for static suspension calculations
+- [Dynamics](https://github.com/MrActis/REV7-Suspension/blob/main/dynamics.py): classes and functions used to model suspension dynamics
+- [Components](https://github.com/MrActis/REV7-Suspension/blob/main/components.py): classes for defining suspension components
+- [Functions](https://github.com/MrActis/REV7-Suspension/blob/main/functions.py): functions for static suspension calculations
 
 **Models**
 - [Rear Suspension](https://github.com/MrActis/REV7-Suspension/blob/main/functions.py): full quarter model of right rear suspension without tire
