@@ -5,7 +5,7 @@
 - [Functions](functions.py): functions for static suspension calculations
 
 **Models**
-- [Rear Suspension](rearsuspension.py): full quarter model of right rear suspension without tire
+- [Rear Suspension](https://github.com/MrActis/REV7-Suspension/blob/main/functions.py): full quarter model of right rear suspension without tire
 
 **Files**
 - [Graphs](Graphs): contains graphs that plot angles and forces during suspension movement
