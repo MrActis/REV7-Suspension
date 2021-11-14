@@ -5,7 +5,7 @@ Classes: Vector, RefFrame
 Functions: make_rotation
 """
 from sympy import ImmutableMatrix, Symbol, shape, sin, cos
-from math import sqrt, acos, radians
+from math import sqrt, acos, radians, degrees
 from collections import deque
 
 
@@ -24,7 +24,7 @@ class Vector:
         subtract(vec)
         dot(vec)
         cross(vec)
-        angle(vec)
+        angle(vec, deg)
     """
     def __init__(self, vec: ImmutableMatrix):
         """
@@ -104,18 +104,23 @@ class Vector:
         else:
             return Vector(self.v.cross(vec.v))
 
-    def angle(self, vec) -> float:
+    def angle(self, vec, deg: bool = True) -> float:
         """
         Angle between two Vectors
         :param vec: vector of type Vector
-        :return: angle between two vectors in radians
+        :param deg: true if angle in degrees, false if angle in radians
+        :return: angle between two vectors
         :rtype: float
         :raises: :class:'ValueError': if input is not of type Vector
         """
         if not isinstance(vec, Vector):
             raise ValueError('input not a vector')
         else:
-            return acos(self.dot(vec) / (self.norm() * vec.norm()))
+            angle = acos(self.dot(vec) / (self.norm() * vec.norm()))
+            if deg:
+                return degrees(angle)
+            else:
+                return angle
 
 
 class RefFrame:
