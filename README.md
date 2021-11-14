@@ -1,5 +1,3 @@
-# REV7 Suspension
-### Codebase for the analysis of Penn Electric Racing's REV7 suspension
 ### Developer(s): Jonathan Lee
 
 ## Directory
