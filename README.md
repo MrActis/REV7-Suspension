@@ -1,3 +1,7 @@
+# REV7 Suspension
+
+### Developer(s): Jonathan Lee
+
 ## Directory
 **Modules**
 - [Dynamics](https://github.com/MrActis/REV7-Suspension/blob/main/dynamics.py): classes and functions used to model suspension dynamics
