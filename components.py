@@ -1,10 +1,11 @@
 """
 Components module
 Contains classes for suspension components
-Classes: ControlArm, Rocker, Shock
+Classes: ControlArm, Rocker, Arb, Shock, QuarterSusp
 """
 from dynamics import Vector, RefFrame, make_rotation
 from sympy import ImmutableMatrix, Symbol, nsolve
+from math import degrees, radians
 
 
 class ControlArm:
@@ -14,26 +15,29 @@ class ControlArm:
     from rear hardpoint to front hardpoint, y-axis to the left, and z-axis
     upwards
     Attributes:
-        f_l : Vector
+        f : Vector
             front hardpoint in local coordinates
-        r_l : Vector
+        r : Vector
             rear hardpoint in local coordinates
-        u_l : Vector
+        u : Vector
             upright hardpoint in local coordinates
-        p_l : Vector
+        pr : Vector
             push/pullrod hardpoint in local coordinates, if it exists
         frame : RefFrame
             local reference frame of control arm
         side : str
             'r' if CA is on right side, 'l' if CA is on left side
+        angle : float
+            upwards angle from ride height in degrees
     Methods:
         __init__(rear, upright, frame, prod, side)
+        axis()
         get_f_p()
         get_r_p()
         get_u_p()
         get_p_p()
         force_u(force_f, force_r)
-        rotate(a, deg)
+        rotate(a, actual, deg)
     """
     def __init__(self, rear: Vector, upright: Vector, frame: RefFrame,
                  prod: Vector = None, side: str = ''):
@@ -46,15 +50,25 @@ class ControlArm:
         :param side: 'r' if CA is on right side, 'l' if CA is on left side
         :raises: :class:'ValueError': if side is invalid
         """
-        si = side.lower()
-        if si != 'r' and si != 'l':
+        s = side.lower()
+        if s != 'r' and s != 'l':
             raise ValueError('invalid side')
-        self.f_l: Vector = Vector(ImmutableMatrix([0.0, 0.0, 0.0]))
-        self.r_l: Vector = rear
-        self.u_l: Vector = upright
-        self.frame: RefFrame = frame
-        self.p_l: Vector = prod
-        self.side: str = side
+        self.f = Vector(ImmutableMatrix([0.0, 0.0, 0.0]))
+        self.r = rear
+        self.u = upright
+        self.frame = frame
+        self.pr = prod
+        self.side = s
+        self.angle = 0.0
+
+    @staticmethod
+    def axis() -> str:
+        """
+        Return rotation axis of control arm
+        :return: rotation axis of control arm
+        :rtype: str
+        """
+        return 'x'
 
     def get_f_p(self) -> Vector:
         """
@@ -62,7 +76,7 @@ class ControlArm:
         :return: front hardpoint in parent coordinates
         :rtype: Vector
         """
-        return self.frame.get_coords(self.f_l, self.frame.get_parent())
+        return self.frame.get_coords(self.f, self.frame.get_parent())
 
     def get_r_p(self) -> Vector:
         """
@@ -70,7 +84,7 @@ class ControlArm:
         :return: rear hardpoint in parent coordinates
         :rtype: Vector
         """
-        return self.frame.get_coords(self.r_l, self.frame.get_parent())
+        return self.frame.get_coords(self.r, self.frame.get_parent())
 
     def get_u_p(self):
         """
@@ -78,19 +92,19 @@ class ControlArm:
         :return: upright hardpoint in parent coordinates
         :rtype: Vector
         """
-        return self.frame.get_coords(self.u_l, self.frame.get_parent())
+        return self.frame.get_coords(self.u, self.frame.get_parent())
 
-    def get_p_p(self):
+    def get_pr_p(self):
         """
         Calculates push/pullrod hardpoint in parent coordinates
         :return: push/pullrod hardpoint in parent coordinates
         :rtype: Vector
         :raises: :class:'ValueError': if there is no push/pullrod hardpoint
         """
-        if self.p_l is None:
+        if self.pr is None:
             raise ValueError('no push/pullrod hardpoint')
         else:
-            return self.frame.get_coords(self.p_l, self.frame.get_parent())
+            return self.frame.get_coords(self.pr, self.frame.get_parent())
 
     def force_u(self, force_f: float, force_r: float) -> ImmutableMatrix:
         """
@@ -100,25 +114,36 @@ class ControlArm:
         :return: equivalent force at the upright hardpoint in local coordinates
         :rtype: ImmutableMatrix
         """
-        f_front = force_f * -self.u_l.unit().v
-        p_rear = self.r_l.subtract(self.u_l)
-        f_rear = force_r * p_rear.unit().v
-        f_upright = f_front + f_rear
-        print('F_x: %s N' % f_upright[0])
-        print('F_y: %s N' % f_upright[1])
-        print('F_z: %s N' % f_upright[2])
-        return f_upright
+        f_front = force_f * -self.u.unit().v
+        f_rear = force_r * self.r.subtract(self.u).unit().v
+        f_up = f_front + f_rear
+        print('F_x: %s N' % f_up[0])
+        print('F_y: %s N' % f_up[1])
+        print('F_z: %s N' % f_up[2])
+        return f_up
 
-    def rotate(self, a: float, deg: bool = True):
+    def rotate(self, a: float, actual: bool = False, deg: bool = True):
         """
-        Updates the reference frame after upwards rotation
+        Updates the reference frame after rotation
         :param a: angle of upwards rotation of type float
+        :param actual: true if actual rotation, false if upwards rotation
         :param deg: true if angle is in degrees, false if angle is in radians
         :return: updates reference frame
         """
-        if self.side == 'r':
-            a = -a
-        rotation_l_new = make_rotation(a, 'x', deg=deg)
+        if actual:
+            if self.side == 'r':
+                a_up = -a
+            else:
+                a_up = a
+        else:
+            a_up = a
+            if self.side == 'r':
+                a = -a
+        if deg:
+            self.angle = self.angle + a_up
+        else:
+            self.angle = self.angle + degrees(a_up)
+        rotation_l_new = make_rotation(a, ControlArm.axis(), deg=deg)
         rotation_g_l = self.frame.get_rotation()
         self.frame.set_rotation(rotation_g_l * rotation_l_new)
 
@@ -129,38 +154,60 @@ class Rocker:
     Defines a suspension rocker with origin at pivot hardpoint, x-axis from
     pivot hardpoint to push/pullrod hardpoint, and z-axis upwards
     Attributes:
-        pi_l : Vector
+        pi : Vector
             pivot hardpoint in local coordinates
-        a_l : Vector
+        a : Vector
             arb hardpoint in local coordinates
-        pr_l : Vector
+        pr : Vector
             push/pullrod hardpoint in local coordinates
-        s_l : Vector
+        s : Vector
             shock hardpoint in local coordinates
         frame : RefFrame
             local reference frame of rocker
+        side : str
+            'r' if rocker is on right side, 'l' if rocker is on left side
+        angle : float
+            inwards angle from ride height in degrees
     Methods:
-        __init__(arb, prod, shock sys)
+        __init__(arb, prod, shock, frame, side)
+        axis()
         get_pi_p()
         get_a_p()
         get_pr_p()
         get_s_p()
-        rotate(a, deg)
+        rotate(a, actual, deg)
     """
     def __init__(self, arb: Vector, prod: Vector, shock: Vector,
-                 frame: RefFrame):
+                 frame: RefFrame, side: str = ''):
         """
         Rocker class constructor
         :param arb: arb hardpoint in local coordinates of type Vector
         :param prod: push/pullrod hardpoint in local coordinates of type Vector
         :param shock: shock hardpoint in local coordinates of type Vector
         :param frame: local reference frame of rocker of type RefFrame
+        :param side: 'r' if rocker is on right side, 'l' if rocker is on left
+                     side
+        :raises: :class:'ValueError': if side is invalid
         """
-        self.pi_l: Vector = Vector(ImmutableMatrix([0.0, 0.0, 0.0]))
-        self.a_l: Vector = arb
-        self.pr_l: Vector = prod
-        self.s_l: Vector = shock
-        self.frame: RefFrame = frame
+        s = side.lower()
+        if s != 'r' and s != 'l':
+            raise ValueError('invalid side')
+        self.pi = Vector(ImmutableMatrix([0.0, 0.0, 0.0]))
+        self.a = arb
+        self.pr = prod
+        self.s = shock
+        self.frame = frame
+        self.side = s
+        self.angle = 0.0
+
+    @staticmethod
+    def axis() -> str:
+        """
+        Return rotation axis of rocker
+        :return: rotation axis of rocker
+        :rtype: str
+        """
+        return 'z'
 
     def get_pi_p(self) -> Vector:
         """
@@ -168,7 +215,7 @@ class Rocker:
         :return: pivot hardpoint in parent coordinates
         :rtype: Vector
         """
-        return self.frame.get_coords(self.pi_l, self.frame.get_parent())
+        return self.frame.get_coords(self.pi, self.frame.get_parent())
 
     def get_a_p(self) -> Vector:
         """
@@ -176,7 +223,7 @@ class Rocker:
         :return: arb hardpoint in parent coordinates
         :rtype: Vector
         """
-        return self.frame.get_coords(self.a_l, self.frame.get_parent())
+        return self.frame.get_coords(self.a, self.frame.get_parent())
 
     def get_pr_p(self) -> Vector:
         """
@@ -184,7 +231,7 @@ class Rocker:
         :return: push/pullrod hardpoint in parent coordinates
         :rtype: Vector
         """
-        return self.frame.get_coords(self.pr_l, self.frame.get_parent())
+        return self.frame.get_coords(self.pr, self.frame.get_parent())
 
     def get_s_p(self) -> Vector:
         """
@@ -192,16 +239,134 @@ class Rocker:
         :return: shock hardpoint in parent coordinates
         :rtype: Vector
         """
-        return self.frame.get_coords(self.s_l, self.frame.get_parent())
+        return self.frame.get_coords(self.s, self.frame.get_parent())
 
-    def rotate(self, a: float, deg: bool = True):
+    def rotate(self, a: float, actual: bool = False, deg: bool = True):
         """
-        Updates the reference frame after counterclockwise rotation
-        :param a: angle of counterclockwise rotation
+        Updates the reference frame after rotation
+        :param a: angle of rotation of type float
+        :param actual: true if actual rotation, false if inwards rotation
         :param deg: true if angle is in degrees, false if angle is in radians
         :return: updates reference frame
         """
-        rotation_l_new = make_rotation(a, 'z', deg=deg)
+        if actual:
+            if self.side == 'l':
+                a_in = -a
+            else:
+                a_in = a
+        else:
+            a_in = a
+            if self.side == 'l':
+                a = -a
+        if deg:
+            self.angle = self.angle + a_in
+        else:
+            self.angle = self.angle + degrees(a_in)
+        rotation_l_new = make_rotation(a, Rocker.axis(), deg=deg)
+        rotation_g_l = self.frame.get_rotation()
+        self.frame.set_rotation(rotation_g_l * rotation_l_new)
+
+
+class Arb:
+    """
+    Arb class
+    Defines a suspension arb with origin at pivot hardpoint, x-axis from pivot
+    hardpoint to arb link hardpoint, and y-axis to left
+    Attributes:
+        pi : Vector
+            pivot hardpoint in local coordinates
+        link : Vector
+            arb link hardpoint in local coordinates
+        frame : RefFrame
+            local reference frame of arb
+        k : float
+            torsion spring constant (GJ/L) in Nm
+        side : str
+            'f' if arb is in front, 'r' if arb is in rear
+        angle : float
+            upwards angle from ride height in degrees
+    Methods:
+        __init__(link, frame, k, side)
+        axis()
+        get_pi_p()
+        get_link_p()
+        get_torque()
+        rotate(a, actual, deg)
+    """
+    def __init__(self, link: Vector, frame: RefFrame, k: float, side: str = ''):
+        """
+        Arb class constructor
+        :param link: arb link hardpoint in local coordinates of type Vector
+        :param frame: local reference frame of arb of type RefFrame
+        :param k: torsion spring constant (GJ/L) in Nm
+        :param side: 'f' if arb is in front, 'r' if arb is in rear
+        :raises: :class:'ValueError': if side is invalid
+        """
+        s = side.lower()
+        if s != 'f' and s != 'r':
+            raise ValueError('invalid side')
+        self.pi = Vector(ImmutableMatrix([0.0, 0.0, 0.0]))
+        self.link = link
+        self.frame = frame
+        self.k = k
+        self.side = s
+        self.angle = 0.0
+
+    @staticmethod
+    def axis() -> str:
+        """
+        Return rotation axis of arb
+        :return: rotation axis of arb
+        :rtype: str
+        """
+        return 'y'
+
+    def get_pi_p(self) -> Vector:
+        """
+        Calculates pivot hardpoint in parent coordinates
+        :return: pivot hardpoint in parent coordinates
+        :rtype: Vector
+        """
+        return self.frame.get_coords(self.pi, self.frame.get_parent())
+
+    def get_link_p(self) -> Vector:
+        """
+        Calculates link hardpoint in parent coordinates
+        :return: link hardpoint in parent coordinates
+        :rtype: Vector
+        """
+        return self.frame.get_coords(self.link, self.frame.get_parent())
+
+    def get_torque(self) -> float:
+        """
+        Calculates "upwards" torque on arb
+        :return: "upwards" torque
+        :rtype: float
+        """
+        return 2 * self.k * radians(self.angle)
+
+    def rotate(self, a: float, actual: bool = False, deg: bool = True):
+        """
+        Updates the reference frame after rotation
+        :param a: angle of rotation
+        :param actual: true if actual rotation, false if upwards rotation
+        :param deg: true if angle is in degrees, false if angle is in radians
+        :return: updates reference frame
+        """
+        if actual:
+            if self.side == 'f':
+                a_up = -a
+            else:
+                a_up = a
+        else:
+            a_up = a
+            if self.side == 'f':
+                a = -a
+        if deg:
+            self.angle = self.angle + a_up
+        else:
+            self.angle = self.angle + degrees(a_up)
+        rotation_l_new = make_rotation(a, Arb.axis(), deg=deg)
         rotation_g_l = self.frame.get_rotation()
         self.frame.set_rotation(rotation_g_l * rotation_l_new)
 
@@ -228,9 +393,9 @@ class Shock:
         :param length: initial length at ride height in m of type float
         :param force: initial force at ride height in N of type float
         """
-        self.__k: float = constant
-        self.__len: float = length
-        self.__force: float = force
+        self.__k = constant
+        self.__len = length
+        self.__force = force
 
     def get_force(self, new_len: float) -> float:
         """
@@ -242,102 +407,167 @@ class Shock:
         return self.__force + self.__k * (self.__len - new_len)
 
 
-class LongAccel:
+class QuarterSusp:
     """
-    LongAccel class
-    Defines relevant suspension geometry for longitudinal acceleration
+    QuarterSusp class
+    Defines suspension geometry for a quarter suspension model
     Attributes:
-        ca : ControlArm
+        lca : ControlArm
+            lower control arm
+        uca : ControlArm
+            upper control arm
+        p_ca : ControlArm
             control arm with push/pullrod hardpoint
         rocker : Rocker
             rocker
+        arb : Arb
+            arb
         shock : Shock
             shock
-        prod : float
+        p_len : float
             length of push/pullrod in m
+        ca_len : float
+            distance between control arm upright hardpoints in m
+        link_len : float
+            length of arb link in m
         side : str
             'r' if on right side, 'l' if on left side
     Methods:
-        __init__(ca, r, k, f_prod)
+        __init__(lca, uca, r, a, s, k, f_prod)
         __make_shock(constant, f_prod)
-        rotate_ca(a, deg)
-        get_forces()
+        rotate_lca(a, actual, deg)
+        get_forces(longitudinal)
     """
-    def __init__(self, ca: ControlArm, r: Rocker, k: float, f_prod: float):
+    def __init__(self, lca: ControlArm, uca: ControlArm, r: Rocker, a: Arb,
+                 s: Shock = None, k: float = 0.0, f_prod: float = 0.0):
         """
-        LongAccel class constructor
-        :param ca: control arm of type ControlArm
+        QuarterSusp class constructor
+        :param lca: lower control arm of type ControlArm
+        :param uca: upper control arm of type ControlArm
         :param r: rocker of type Rocker
+        :param a: arb of type Arb
+        :param s: shock of type Shock
         :param k: spring constant in N/m of type float
         :param f_prod: initial force on push/pullrod at ride height in N of
                        type float
         """
-        self.ca: ControlArm = ca
-        self.rocker: Rocker = r
-        self.shock: Shock = self.__make_shock(k, f_prod)
-        self.prod: float = r.get_pr_p().subtract(ca.get_p_p()).norm()
-        self.side: str = ca.side
+        if lca.side != uca.side or uca.side != r.side:
+            raise ValueError('side mismatch')
+        if lca.pr is None and uca.pr is None:
+            raise ValueError('missing prod hardpoint')
+        self.lca = lca
+        self.uca = uca
+        self.rocker = r
+        self.arb = a
+        if lca.pr is None:
+            self.p_ca = uca
+            self.p_len = r.get_pr_p().subtract(uca.get_pr_p()).norm()
+        else:
+            self.p_ca = lca
+            self.p_len = r.get_pr_p().subtract(lca.get_pr_p()).norm()
+        if s is None:
+            self.shock = self.__make_shock(k, f_prod)
+        else:
+            self.shock = s
+        self.ca_len = lca.get_u_p().subtract(uca.get_u_p()).norm()
+        self.link_len = r.get_a_p().subtract(a.get_link_p()).norm()
+        self.side = lca.side
 
     def __make_shock(self, constant: float, f_prod: float) -> Shock:
         """
-        Make shock for LongAccel object
+        Make shock for QuarterSusp object
         :param constant: spring constant in N/m of type float
         :param f_prod: initial force on push/pullrod at ride height in N of
                        type float, positive is compression
-        :return: shock for LongAccel object
+        :return: shock for QuarterSusp object
         :rtype: Shock
         """
         # moment balance to find shock force
         length = self.rocker.get_s_p().norm()
         r_l_p = self.rocker.frame.get_rotation() ** -1
-        l_prod = self.rocker.get_pr_p().subtract(self.ca.get_p_p())
-        l_prod = r_l_p * l_prod.v
+        l_prod = r_l_p * self.rocker.get_pr_p().subtract(self.p_ca.get_pr_p()).v
         n_prod = Vector(l_prod).unit()
         l_shock = r_l_p * self.rocker.get_s_p().v
         n_shock = Vector(l_shock).unit()
-        m_prod = self.rocker.pr_l.cross(n_prod)
-        m_shock = self.rocker.s_l.cross(n_shock)
+        m_prod = self.rocker.pr.cross(n_prod)
+        m_shock = self.rocker.s.cross(n_shock)
         f_shock = -f_prod * m_prod.v[2] / m_shock.v[2]
         return Shock(constant, length, f_shock)
 
-    def rotate_ca(self, a: float, deg: bool = True) -> float:
+    def rotate_lca(self, a: float, actual: bool = False, deg: bool = True):
         """
-        Rotates CA, finds corresponding rocker rotation, and rotates rocker
-        :param a: angle of upwards rotation
+        Rotates quarter suspension by rotating the lca
+        :param a: angle of rotation
+        :param actual: true if actual rotation, false if upwards rotation
         :param deg: true if angle is in degrees, false if angle is in radians
-        :return: rotates CA and rocker, returns new rocker angle
-        :rtype: float
+        :return: rotates quarter suspension, returns angles of rotation in the
+                 order lca, uca, rocker, arb
         """
         x = Symbol('x')
-        self.ca.rotate(a, deg)
-        r_l_n = make_rotation(x, 'z', deg=False)
-        r_p_l = self.rocker.frame.get_rotation()
-        r_p_n = r_p_l * r_l_n
-        pr_p = self.rocker.get_pi_p().v + r_p_n * self.rocker.pr_l.v
-        pr_len = pr_p - self.ca.get_p_p().v
-        length = self.prod ** 2
-        eqn = pr_len[0] ** 2 + pr_len[1] ** 2 + pr_len[2] ** 2 - length
-        sol = float(nsolve(eqn, x, 0.0))
-        self.rocker.rotate(sol, deg=False)
-        return sol
+        self.lca.rotate(a, actual, deg)
 
-    def get_forces(self):
+        # solve for uca rotation
+        uca_l_n = make_rotation(x, self.uca.axis(), deg=False)
+        uca_p_l = self.uca.frame.get_rotation()
+        uca_p_n = uca_p_l * uca_l_n
+        uca_up_pos = self.uca.get_f_p().v + uca_p_n * self.uca.u.v
+        ca_dist = uca_up_pos - self.lca.get_u_p().v
+        ca_length = self.ca_len ** 2
+        ca_eqn = ca_dist[0] ** 2 + ca_dist[1] ** 2 + ca_dist[2] ** 2 - ca_length
+        uca_sol = float(nsolve(ca_eqn, x, 0.0))
+        self.uca.rotate(uca_sol, actual=True, deg=False)
+
+        # solve for rocker rotation
+        rocker_l_n = make_rotation(x, self.rocker.axis(), deg=False)
+        rocker_p_l = self.rocker.frame.get_rotation()
+        rocker_p_n = rocker_p_l * rocker_l_n
+        pr_pos = self.rocker.get_pi_p().v + rocker_p_n * self.rocker.pr.v
+        pr_dist = pr_pos - self.p_ca.get_pr_p().v
+        pr_length = self.p_len ** 2
+        r_eqn = pr_dist[0] ** 2 + pr_dist[1] ** 2 + pr_dist[2] ** 2 - pr_length
+        r_sol = float(nsolve(r_eqn, x, 0.0))
+        self.rocker.rotate(r_sol, actual=True, deg=False)
+
+        # solve for arb rotation
+        arb_l_n = make_rotation(x, self.arb.axis(), deg=False)
+        arb_p_l = self.arb.frame.get_rotation()
+        arb_p_n = arb_p_l * arb_l_n
+        link_pos = self.arb.get_pi_p().v + arb_p_n * self.arb.link.v
+        l_dist = link_pos - self.rocker.get_a_p().v
+        l_length = self.link_len ** 2
+        l_eqn = l_dist[0] ** 2 + l_dist[1] ** 2 + l_dist[2] ** 2 - l_length
+        l_sol = float(nsolve(l_eqn, x, 0.0))
+        self.arb.rotate(l_sol, actual=True, deg=False)
+
+    def get_forces(self, longitudinal: bool = True):
         """
-        Calculates forces on shock and push/pullrod
-        :return: force on shock and force on push/pullrod
+        Calculates forces on rocker
+        :param longitudinal: true if acceleration is longitudinal, false if
+                             acceleration is lateral
+        :return: compressive force on rocker in order shock, arb, prod
         :rtype: tuple
         """
-        # moment balance to find force on push/pullrod
-        pr_p = self.rocker.get_pr_p()
-        s_p = self.rocker.get_s_p()
+        # find force on arb link, positive is tension, negative is compression
+        if longitudinal:
+            f_arb = 0.0
+        else:
+            r_arb = self.arb.link
+            f_arb = self.rocker.frame.get_coords(self.rocker.a, self.arb.frame)
+            d_arb = f_arb.subtract(r_arb).unit()
+            t_arb = self.arb.get_torque()
+            f_arb = t_arb / (r_arb.cross(d_arb).v[1])
+        # moment balance to find forces
         r_l_p = self.rocker.frame.get_rotation() ** -1
-        l_prod = r_l_p * (pr_p.v - self.ca.get_p_p().v)
-        n_prod = Vector(l_prod).unit()
-        l_shock = r_l_p * s_p.v
-        n_shock = Vector(l_shock).unit()
-        m_prod = self.rocker.pr_l.cross(n_prod)
-        m_shock = self.rocker.s_l.cross(n_shock)
-        length = s_p.norm()
-        f_shock = self.shock.get_force(length)
-        f_prod = -f_shock * m_shock.v[2] / m_prod.v[2]
-        return f_shock, f_prod
+        s_len = self.rocker.get_s_p().norm()
+        f_shock = self.shock.get_force(s_len)
+        l_shock = Vector(r_l_p * self.rocker.get_s_p().v)
+        n_shock = l_shock.unit()
+        l_arb = self.rocker.get_a_p().subtract(self.arb.get_link_p()).unit()
+        n_arb = Vector(r_l_p * l_arb.v)
+        l_prod = self.rocker.get_pr_p().subtract(self.p_ca.get_pr_p()).unit()
+        n_prod = Vector(r_l_p * l_prod.v)
+        m_shock = self.rocker.s.cross(n_shock)
+        m_arb = self.rocker.a.cross(n_arb)
+        m_prod = self.rocker.pr.cross(n_prod)
+        f_prod = (f_arb * m_arb.v[2] - f_shock * m_shock.v[2]) / m_prod.v[2]
+        return f_shock, -f_arb, f_prod
