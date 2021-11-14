@@ -1,5 +1,3 @@
-### Developer(s): Jonathan Lee
-
 ## Directory
 **Modules**
 - [Dynamics](dynamics.py): classes and functions used to model suspension dynamics
