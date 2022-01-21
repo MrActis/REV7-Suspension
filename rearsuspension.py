@@ -54,7 +54,7 @@ rocker_frame = RefFrame(h_rocker, p=global_frame, r=rocker_transform)
 arb_frame = RefFrame(h_arb, p=global_frame, r=arb_transform)
 
 # suspension components
-stiffness = 674.825287  # in Nm
+stiffness = 728.4537866  # in Nm
 rear_lca = cp.ControlArm(h_lca_r, h_lca_up, lca_frame, prod=h_lca_pr, side='r')
 rear_uca = cp.ControlArm(h_uca_r, h_uca_up, uca_frame, side='r')
 rear_rocker = cp.Rocker(h_r_arb, h_r_pr, h_r_shock, rocker_frame, side='r')
@@ -65,7 +65,6 @@ static_force = 865.2889167210222  # compression in N
 k = 31429.79901991958  # in N/m
 rear_susp = cp.QuarterSusp(rear_lca, rear_uca, rear_rocker, rear_arb, k=k,
                            f_prod=static_force)
-
 # calculate angles and forces
 start_angle = -4.7  # in degrees
 end_angle = 4.7  # in degrees
@@ -174,6 +173,15 @@ plt.plot(f_s_roll, f_a_roll)
 plt.grid(True)
 plt.title('ARB Force vs. Shock Force During Roll')
 plt.xlabel('Shock Force (N)')
+plt.ylabel('ARB Force (N)')
+plt.tight_layout()
+
+plot11 = plt.figure(11)
+angles_lca = 39.3701 * np.deg2rad(angles_lca)
+plt.plot(angles_lca / 2, f_a_roll / 2)
+plt.grid(True)
+plt.title('ARB Force vs. Wheel Travel')
+plt.xlabel('Wheel Travel (in)')
 plt.ylabel('ARB Force (N)')
 plt.tight_layout()
 

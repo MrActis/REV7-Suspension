@@ -343,7 +343,7 @@ class Arb:
         :return: "upwards" torque
         :rtype: float
         """
-        return 2 * self.k * radians(self.angle)
+        return self.k * radians(self.angle)
 
     def rotate(self, a: float, actual: bool = False, deg: bool = True):
         """
