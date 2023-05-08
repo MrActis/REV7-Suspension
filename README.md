@@ -12,7 +12,7 @@
 - [Rear Suspension](https://github.com/MrActis/REV7-Suspension/blob/main/functions.py): full quarter model of right rear suspension without tire
 
 **Files**
-- [Graphs](Graphs): contains graphs that plot angles and forces during suspension movement
+- [Graphs](Graphs/): contains graphs that plot angles and forces during suspension movement
     - [Angles](Graphs/Graphs%20-%20Angles): graphs that plot relative motion of suspension components
     - [Forces](Graphs/Graphs%20-%20Forces): graphs that plot forces on rocker
 
